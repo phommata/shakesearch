@@ -28,3 +28,22 @@ We will be primarily evaluating based on how well the search works for users. A 
 1. Fork this repository and send us a link to your fork after pushing your changes.
 2. Render (render.com) hosting, the application deploys cleanly from a public url.
 3. In your submission, share with us what changes you made and how you would prioritize changes if you had more time.
+
+## Prioritize Changes
+
+1. Add Boostrap styling
+2. Mark string
+3. Case-insensitive
+4. Pagination
+5. Infix/fuzzy match
+6. Bleve or Elasticsearch
+7. Auto complete
+8. Relevance score
+9. Transform ebook 
+    a. List of contents - '      Contents\n'
+    b. First work in list of contents - '               THE SONNETS\n' (44 works)
+    c. Each work starts with - 'TITLE:'
+    d. Book chapters
+        i. Tragedy contains scene 
+        ii. Novel number/roman chapters 
+        iii. Poem new line and strings
