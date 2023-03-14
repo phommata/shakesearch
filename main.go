@@ -9,8 +9,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 )
+
+const RESULT_LIMIT = 10
 
 func main() {
 	searcher := Searcher{}
@@ -41,6 +44,14 @@ type Searcher struct {
 	SuffixArray   *suffixarray.Index
 }
 
+type APIResponse struct {
+	Results     []string `json:"results"`
+	ResultCount int      `json:"resultCount"`
+	Limit       int      `json:"resultLimit"`
+	Page        int      `json:"page"`
+	TotalPages  int      `json:"totalPages"`
+}
+
 func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		query, ok := r.URL.Query()["q"]
@@ -49,10 +60,38 @@ func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request
 			w.Write([]byte("missing search query in URL params"))
 			return
 		}
+
+		var err error
+		pageStr := r.URL.Query().Get("page")
+		page := 1
+
+		if pageStr != "" {
+			page, err = strconv.Atoi(pageStr)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				fmt.Println("Erorr", err)
+				fmt.Fprintf(w, "unable to parse page number")
+				return
+			}
+		}
+
 		results := searcher.Search(query[0])
+
+		resultLen := len(results)
+		totalPages := resultLen / RESULT_LIMIT
+
+		res := APIResponse{
+			Results:     paginate(results, page, RESULT_LIMIT),
+			ResultCount: resultLen,
+			Limit:       RESULT_LIMIT,
+			Page:        page,
+			TotalPages:  totalPages,
+		}
+
 		buf := &bytes.Buffer{}
 		enc := json.NewEncoder(buf)
-		err := enc.Encode(results)
+		err = enc.Encode(res)
+
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("encoding failure"))
@@ -83,4 +122,17 @@ func (s *Searcher) Search(query string) []string {
 		results = append(results, stringBlock)
 	}
 	return results
+}
+
+func paginate(x []string, page int, limit int) []string {
+	if page > len(x) {
+		page = len(x)
+	}
+
+	end := page + limit
+	if end > len(x) {
+		end = len(x)
+	}
+
+	return x[page:end]
 }
