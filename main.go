@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -69,13 +70,20 @@ func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request
 			page, err = strconv.Atoi(pageStr)
 			if err != nil {
 				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Println("Erorr", err)
+				fmt.Println("Error", err)
 				fmt.Fprintf(w, "unable to parse page number")
 				return
 			}
 		}
 
-		results := searcher.Search(query[0])
+		results, err := searcher.Search(query[0])
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Println("Error", err)
+			fmt.Fprintf(w, "unable to search")
+			return
+		}
 
 		resultLen := len(results)
 		totalPages := resultLen / RESULT_LIMIT
@@ -112,15 +120,34 @@ func (s *Searcher) Load(filename string) error {
 	return nil
 }
 
-func (s *Searcher) Search(query string) []string {
-	idxs := s.SuffixArray.Lookup([]byte(strings.ToLower(query)), -1)
+func (s *Searcher) Search(query string) ([]string, error) {
+	regex, err := regexp.Compile(fmt.Sprintf("(?i)\\w?%s\\w?", query))
+	if err != nil {
+		return []string{}, err
+	}
+	idxs := s.SuffixArray.FindAllIndex(regex, -1)
 	results := []string{}
 	for _, idx := range idxs {
-		foundString := s.CompleteWorks[idx : idx+len(query)]
-		foundString = fmt.Sprintf("<mark>%s</mark>", foundString)
-		stringBlock := s.CompleteWorks[idx-250:idx] + foundString + s.CompleteWorks[idx+len(query):idx+250]
-		results = append(results, stringBlock)
+		results = s.markResult(idx, query, results)
 	}
+	return results, nil
+}
+
+func (s *Searcher) markResult(idx []int, query string, results []string) []string {
+	startIdx := idx[0]
+	endIdx := idx[1]
+
+	// string of query match
+	foundString := s.CompleteWorks[startIdx:endIdx]
+	substrIdx := strings.Index(foundString, query)
+
+	// get and mark query substring
+	queryIdx := startIdx + substrIdx
+	substr := s.CompleteWorks[queryIdx : queryIdx+len(query)]
+	substr = fmt.Sprintf("<mark>%s</mark>", substr)
+
+	stringBlock := s.CompleteWorks[queryIdx-250:queryIdx] + substr + s.CompleteWorks[queryIdx+len(query):queryIdx+250]
+	results = append(results, stringBlock)
 	return results
 }
 
