@@ -29,21 +29,21 @@ We will be primarily evaluating based on how well the search works for users. A 
 2. Render (render.com) hosting, the application deploys cleanly from a public url.
 3. In your submission, share with us what changes you made and how you would prioritize changes if you had more time.
 
-## Prioritize Changes
+## Prioritized Changes
 
 1. Add Boostrap styling
-2. Mark string
-3. Case-insensitive
-4. Pagination
-5. Infix/fuzzy match
-6. Bleve or Elasticsearch
-7. Auto complete
-8. Relevance score
-9. Transform ebook 
+2. Mark string in results
+3. Case-insensitive search
+4. Pagination of results
+5. TODO: Infix/fuzzy search
+6. TODO: Transform ebook to return work title in result
     a. List of contents - '      Contents\n'
     b. First work in list of contents - '               THE SONNETS\n' (44 works)
     c. Each work starts with - 'TITLE:'
-    d. Book chapters
+    d. Chapters
         i. Tragedy contains scene 
         ii. Novel number/roman chapters 
         iii. Poem new line and strings
+7. TODO: Multiple words search
+8. TODO: Auto complete
+9. TODO: Relevance score
