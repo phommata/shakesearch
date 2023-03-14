@@ -35,7 +35,7 @@ const Controller = {
 
         for (let page = response.page, start = page, end = page + RESULT_LIMIT; page <= end && page < response.totalPages; page++) {
             previousPage = start - 1
-            if (previous == false && previousPage > 1) {
+            if (previous == false && previousPage > 0) {
                 paginate(pagination, previousPage);
                 previous = true;
             }
