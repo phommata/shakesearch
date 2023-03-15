@@ -108,7 +108,6 @@ func (s *Searcher) Load(filename string) error {
 		regex := regexp.MustCompile(workTitles[idx])
 		titleIndexes := rawSuffixArray.FindAllIndex(regex, 2)
 		s.WorkIndexes[workTitles[idx]] = titleIndexes[1][0]
-		fmt.Println(workTitles[idx], titleIndexes[1][0])
 	}
 
 	return nil
