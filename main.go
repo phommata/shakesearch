@@ -104,8 +104,11 @@ func (s *Searcher) Load(filename string) error {
 
 	s.WorkIndexes = make(map[string]int)
 
+	// build work start indexes
 	for idx := 0; idx < len(workTitles); idx++ {
 		regex := regexp.MustCompile(workTitles[idx])
+
+		// find second case-sensitive title
 		titleIndexes := rawSuffixArray.FindAllIndex(regex, 2)
 		s.WorkIndexes[workTitles[idx]] = titleIndexes[1][0]
 	}
@@ -168,6 +171,7 @@ func (s *Searcher) Search(query string) ([]Work, error) {
 	count := 0
 	workIdx := 0
 
+	// case-insensitive, optional surrounding word character of query
 	regex, err := regexp.Compile(fmt.Sprintf("(?i)\\w?%s\\w?", query))
 	if err != nil {
 		return []Work{}, err
@@ -176,6 +180,7 @@ func (s *Searcher) Search(query string) ([]Work, error) {
 	workTitles := getWorkTitles()
 	queryIdxs := s.SuffixArray.FindAllIndex(regex, -1)
 
+	// build works' results
 	for _, queryIdx := range queryIdxs {
 		if workIdx == len(workTitles) {
 			break
@@ -190,8 +195,10 @@ func (s *Searcher) Search(query string) ([]Work, error) {
 
 		startIdx := queryIdx[0]
 
+		// build works' result until next work start index
 		if startIdx > currWorkIdx && startIdx < nextWorkIdx {
-			results = s.markResult(queryIdx, query, results)
+			stringBlock := s.markResult(queryIdx, query, results)
+			results = append(results, stringBlock)
 			count++
 		} else if startIdx >= nextWorkIdx {
 			if len(results) == 0 {
@@ -214,13 +221,13 @@ func (s *Searcher) Search(query string) ([]Work, error) {
 	return works, nil
 }
 
-func (s *Searcher) markResult(idx []int, query string, results []string) []string {
+func (s *Searcher) markResult(idx []int, query string, results []string) string {
 	startIdx := idx[0]
 	endIdx := idx[1]
 
 	// string of query match
 	foundString := s.CompleteWorks[startIdx:endIdx]
-	substrIdx := strings.Index(foundString, query)
+	substrIdx := strings.Index(strings.ToLower(foundString), strings.ToLower(query))
 
 	// get and mark query substring
 	queryIdx := startIdx + substrIdx
@@ -228,19 +235,11 @@ func (s *Searcher) markResult(idx []int, query string, results []string) []strin
 	substr = fmt.Sprintf("<mark>%s</mark>", substr)
 
 	stringBlock := s.CompleteWorks[queryIdx-250:queryIdx] + substr + s.CompleteWorks[queryIdx+len(query):queryIdx+250]
-	results = append(results, stringBlock)
-	return results
+
+	return stringBlock
 }
 
-func paginate(x []string, page int, limit int) []string {
-	if page > len(x) {
-		page = len(x)
-	}
 
-	end := page + limit
-	if end > len(x) {
-		end = len(x)
-	}
+	workContents := s.WorkIndexes[title]
 
-	return x[page:end]
 }
