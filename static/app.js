@@ -22,10 +22,20 @@ const Controller = {
         let table = document.getElementById("table-body");
         table.innerHTML = "";
 
-        for (let result of response.results) {
-            let tr = table.insertRow();
-            let td = tr.insertCell();
-            td.innerHTML = result;
+        for (let work of response.works) {
+            for (let result of work.results) {
+                let tr = table.insertRow();
+                let td = document.createElement('td');
+                td.innerHTML = work.title;
+                td.style.fontWeight = "bold";
+                td.style.fontSize = "18px";
+                tr.appendChild(td);
+
+                tr = table.insertRow();
+                td = document.createElement('td');
+                td.innerHTML = result;
+                tr.appendChild(td);
+            }
         }
     },
     updatePagination: (response, query) => {
