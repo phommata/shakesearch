@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"os"
 	"regexp"
-	"strconv"
 	"strings"
 )
 
@@ -53,11 +52,7 @@ type Work struct {
 	Results []string `json:"results"`
 }
 type APIResponse struct {
-	Works       []Work `json:"works"`
-	ResultCount int    `json:"resultCount"`
-	Limit       int    `json:"resultLimit"`
-	Page        int    `json:"page"`
-	TotalPages  int    `json:"totalPages"`
+	Works []Work `json:"works"`
 }
 
 func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request) {
@@ -69,21 +64,7 @@ func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		var err error
-		pageStr := r.URL.Query().Get("page")
-		page := 1
-
-		if pageStr != "" {
-			page, err = strconv.Atoi(pageStr)
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				fmt.Println("Error", err)
-				fmt.Fprintf(w, "unable to parse page number")
-				return
-			}
-		}
-
-		works, totalResults, err := searcher.Search(query[0])
+		works, err := searcher.Search(query[0])
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
@@ -92,14 +73,8 @@ func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		totalPages := totalResults / RESULT_LIMIT
-
 		res := APIResponse{
-			Works:       works,
-			ResultCount: totalResults,
-			Limit:       RESULT_LIMIT,
-			Page:        page,
-			TotalPages:  totalPages,
+			Works: works,
 		}
 
 		buf := &bytes.Buffer{}
@@ -188,7 +163,7 @@ func getWorkTitles() []string {
 	}
 }
 
-func (s *Searcher) Search(query string) ([]Work, int, error) {
+func (s *Searcher) Search(query string) ([]Work, error) {
 	works := []Work{}
 	results := []string{}
 	count := 0
@@ -196,7 +171,7 @@ func (s *Searcher) Search(query string) ([]Work, int, error) {
 
 	regex, err := regexp.Compile(fmt.Sprintf("(?i)\\w?%s\\w?", query))
 	if err != nil {
-		return []Work{}, count, err
+		return []Work{}, err
 	}
 
 	workTitles := getWorkTitles()
@@ -237,7 +212,7 @@ func (s *Searcher) Search(query string) ([]Work, int, error) {
 		}
 	}
 
-	return works, count, nil
+	return works, nil
 }
 
 func (s *Searcher) markResult(idx []int, query string, results []string) []string {
