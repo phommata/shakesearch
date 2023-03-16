@@ -38,17 +38,16 @@ We will be primarily evaluating based on how well the search works for users. A 
 5. ETL list of works - 'Contents\n' (44 works total)
     a. Hard code since this is expected to not change
     b. or find works in list of contents - 'THE SONNETS\n'... 
-6. TODO: Link work
+6. Link work title to view
     a. External URL
     b. Better to have internal URL
 7. TODO: Filter by work results
 8. TODO: Improve search of titled work contents with Bleve or ElasticSearch
-9. TODO: Multiple words search
+9. TODO: Relevance score
 10. TODO: Auto complete
-11. TODO: Relevance score
-12. TODO: ETL and search chapters
+11. TODO: ETL and search chapters
     a. Tragedy contains act and scene 
     b. Novel number/roman chapters 
     c. Poem new line and strings
-13. TODO: ETL Speaker - name, dialogue, and new line
-14. TODO: Pagination of results
+12. TODO: ETL Speaker - name, dialogue, and new line
+13. TODO: Pagination of results
