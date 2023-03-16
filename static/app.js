@@ -1,10 +1,11 @@
-const RESULT_LIMIT = 10;
 const Controller = {
     search: (ev) => {
         ev.preventDefault();
         const form = document.getElementById("form");
         const data = Object.fromEntries(new FormData(form));
-        const query = data.query
+        const query = data.query;
+        document.getElementById("table-body").hidden = true;
+        document.getElementById("spinner").hidden = false;
         const response = fetch(`/search?q=${query}`).then((response) => {
             response.json().then((response) => {
                 Controller.updateTable(response);
@@ -39,18 +40,19 @@ const Controller = {
             }
         }
 
-        table.hidden = false;
+        document.getElementById("spinner").hidden = true;
         document.getElementById("work").hidden = true;
+        table.hidden = false;
     },
 
     getWork: (title) => {
+        document.getElementById("work").hidden = true;
+        document.getElementById("spinner").hidden = false;
         const response = fetch(`/work?t=${title}`).then((response) => {
             response.json().then((response) => {
                 if (response.hasOwnProperty("title")) {
                     Controller.updateWorkContent(response);
                 } else {
-                    console.log("response", response);
-                    console.log("missing work title");
                     let errResponse = { title: "missing work title", contents: "" }
                     Controller.updateWorkContent(errResponse);
                 }
@@ -62,6 +64,7 @@ const Controller = {
         document.getElementById("table-body").hidden = true;
         document.getElementById("title").innerText = response['title'];
         document.getElementById("contents").innerText = response['contents'];
+        document.getElementById("spinner").hidden = true;
         document.getElementById("work").hidden = false;
     }
 };
