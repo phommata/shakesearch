@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"index/suffixarray"
 	"io/ioutil"
@@ -13,9 +15,7 @@ import (
 	"strings"
 )
 
-const RESULT_LIMIT = 10
 const MAX_INT = int(0 >> 1)
-const FIRST_WORK = "the sonnets"
 
 func main() {
 	searcher := Searcher{}
@@ -28,10 +28,11 @@ func main() {
 	http.Handle("/", fs)
 
 	http.HandleFunc("/search", handleSearch(searcher))
+	http.HandleFunc("/work", handleWork(searcher))
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "3002"
+		port = "3001"
 	}
 
 	fmt.Printf("Listening on port %s...", port)
@@ -48,11 +49,22 @@ type Searcher struct {
 }
 
 type Work struct {
-	Title   string   `json:"title"`
-	Results []string `json:"results"`
+	Title    string   `json:"title"`
+	Contents string   `json:"contents"`
+	Results  []string `json:"results"`
 }
-type APIResponse struct {
+
+type SearchResponse struct {
 	Works []Work `json:"works"`
+}
+
+type WorkResponse struct {
+	Title    string `json:"title"`
+	Contents string `json:"contents"`
+}
+
+type ErrorResponse struct {
+	Message string `json:"message"`
 }
 
 func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request) {
@@ -69,26 +81,67 @@ func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Println("Error", err)
-			fmt.Fprintf(w, "unable to search")
+
+			res := ErrorResponse{Message: err.Error()}
+			writeResponse(err, res, w)
+
 			return
 		}
 
-		res := APIResponse{
+		res := SearchResponse{
 			Works: works,
 		}
 
-		buf := &bytes.Buffer{}
-		enc := json.NewEncoder(buf)
-		err = enc.Encode(res)
+		writeResponse(err, res, w)
+	}
+}
+
+func handleWork(searcher Searcher) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		title, ok := r.URL.Query()["t"]
+		if !ok || len(title[0]) < 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("missing title in URL params"))
+			return
+		}
+
+		work, err := searcher.GetWork(title[0])
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("encoding failure"))
+			fmt.Println("Error", err)
+
+			res := ErrorResponse{Message: err.Error()}
+			writeResponse(err, res, w)
+
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(buf.Bytes())
+
+		res := WorkResponse{
+			Title:    work.Title,
+			Contents: work.Contents,
+		}
+
+		writeResponse(err, res, w)
 	}
+}
+
+func writeResponse(err error, res interface{}, w http.ResponseWriter) {
+	buf := &bytes.Buffer{}
+	enc := json.NewEncoder(buf)
+	err = enc.Encode(res)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("encoding failure"))
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Encoding", "gzip")
+
+	gz := gzip.NewWriter(w)
+	defer gz.Close()
+	gz.Write(buf.Bytes())
 }
 
 func (s *Searcher) Load(filename string) error {
@@ -168,8 +221,6 @@ func getWorkTitles() []string {
 func (s *Searcher) Search(query string) ([]Work, error) {
 	works := []Work{}
 	results := []string{}
-	count := 0
-	workIdx := 0
 
 	// case-insensitive, optional surrounding word character of query
 	regex, err := regexp.Compile(fmt.Sprintf("(?i)\\w?%s\\w?", query))
@@ -179,43 +230,58 @@ func (s *Searcher) Search(query string) ([]Work, error) {
 
 	workTitles := getWorkTitles()
 	queryIdxs := s.SuffixArray.FindAllIndex(regex, -1)
+	firstWorkIdx := s.WorkIndexes[workTitles[0]]
+	queryIdx := 0
 
-	// build works' results
-	for _, queryIdx := range queryIdxs {
-		if workIdx == len(workTitles) {
-			break
-		}
+	// move query index to after first work index
+	for queryIdxs[queryIdx][0] < firstWorkIdx {
+		queryIdx++
+	}
 
+	// loop through works to match with each query index
+	for workIdx := 0; workIdx < len(workTitles) && queryIdx < len(queryIdxs); {
+
+		// find first query result after first work
+		queryIdxPoints := queryIdxs[queryIdx]
+		queryStartIdx := queryIdxPoints[0]
 		currWorkIdx := s.WorkIndexes[workTitles[workIdx]]
 		nextWorkIdx := MAX_INT
 
-		if workIdx < len(workTitles)-1 {
+		if workIdx+1 < len(workTitles) {
 			nextWorkIdx = s.WorkIndexes[workTitles[workIdx+1]]
 		}
 
-		startIdx := queryIdx[0]
 
-		// build works' result until next work start index
-		if startIdx > currWorkIdx && startIdx < nextWorkIdx {
-			stringBlock := s.markResult(queryIdx, query, results)
-			results = append(results, stringBlock)
-			count++
-		} else if startIdx >= nextWorkIdx {
-			if len(results) == 0 {
-				continue
+		// build works' results and move work start index forward
+		if queryStartIdx > nextWorkIdx {
+
+			if len(results) > 0 {
+				work := Work{Title: workTitles[workIdx], Results: results}
+				works = append(works, work)
+				results = []string{}
 			}
-			work := Work{Title: workTitles[workIdx], Results: results}
-			works = append(works, work)
-			count++
 			workIdx++
-			results = []string{}
-		} else if count == RESULT_LIMIT {
-			if len(results) == 0 {
+		}
+
+		// find query's matching work
+		if queryStartIdx > currWorkIdx && queryStartIdx < nextWorkIdx {
+			stringBlock := s.markResult(queryIdxPoints, query, results)
+			results = append(results, stringBlock)
+
+			// save last works' results
+			if queryIdx+1 == len(queryIdxs) {
+
+				work := Work{Title: workTitles[workIdx], Results: results}
+				works = append(works, work)
+
 				break
 			}
-			work := Work{Title: workTitles[workIdx], Results: results}
-			works = append(works, work)
+
+			// move query indexes
+			queryIdx++
+			queryIdxPoints = queryIdxs[queryIdx]
 		}
+
 	}
 
 	return works, nil
@@ -239,7 +305,33 @@ func (s *Searcher) markResult(idx []int, query string, results []string) string 
 	return stringBlock
 }
 
+func (s *Searcher) GetWork(title string) (Work, error) {
+	var workEndIdx int
+	workStartIdx, ok := s.WorkIndexes[title]
+	if !ok {
+		return Work{}, errors.New("work not found")
+	}
 
-	workContents := s.WorkIndexes[title]
+	// find end index
+	for _, title := range getWorkTitles() {
+		workIdx := s.WorkIndexes[title]
+		if workIdx > workStartIdx {
+			workEndIdx = workIdx
+			break
+		}
+	}
 
+	newLineLen := len(title + "\r\n\r\n")
+	var workContents string
+
+	// get work contents
+	if workEndIdx == 0 {
+		workContents = s.CompleteWorks[workStartIdx+newLineLen:]
+	} else {
+		workContents = s.CompleteWorks[workStartIdx+newLineLen : workEndIdx]
+	}
+
+	work := Work{Title: title, Contents: strings.TrimSpace(workContents)}
+
+	return work, nil
 }
