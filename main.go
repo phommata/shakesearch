@@ -81,9 +81,10 @@ func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Println("Error", err)
+			// fmt.Fprintf(w, "unable to search")
 
 			res := ErrorResponse{Message: err.Error()}
-			writeResponse(err, res, w)
+			writeResponse(err, res, w, true)
 
 			return
 		}
@@ -92,7 +93,7 @@ func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request
 			Works: works,
 		}
 
-		writeResponse(err, res, w)
+		writeResponse(err, res, w, false)
 	}
 }
 
@@ -112,7 +113,7 @@ func handleWork(searcher Searcher) func(w http.ResponseWriter, r *http.Request) 
 			fmt.Println("Error", err)
 
 			res := ErrorResponse{Message: err.Error()}
-			writeResponse(err, res, w)
+			writeResponse(err, res, w, true)
 
 			return
 		}
@@ -122,11 +123,11 @@ func handleWork(searcher Searcher) func(w http.ResponseWriter, r *http.Request) 
 			Contents: work.Contents,
 		}
 
-		writeResponse(err, res, w)
+		writeResponse(err, res, w, false)
 	}
 }
 
-func writeResponse(err error, res interface{}, w http.ResponseWriter) {
+func writeResponse(err error, res interface{}, w http.ResponseWriter, useBuffer bool) {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
 	err = enc.Encode(res)
@@ -137,6 +138,11 @@ func writeResponse(err error, res interface{}, w http.ResponseWriter) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+
+	if useBuffer {
+		w.Write(buf.Bytes())
+		return
+	}
 	w.Header().Set("Content-Encoding", "gzip")
 
 	gz := gzip.NewWriter(w)
