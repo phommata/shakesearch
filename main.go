@@ -72,7 +72,9 @@ func handleSearch(searcher Searcher) func(w http.ResponseWriter, r *http.Request
 		query, ok := r.URL.Query()["q"]
 		if !ok || len(query[0]) < 1 {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("missing search query in URL params"))
+			res := ErrorResponse{Message: "missing search query in URL params"}
+			writeResponse(nil, res, w, true)
+
 			return
 		}
 
@@ -102,7 +104,9 @@ func handleWork(searcher Searcher) func(w http.ResponseWriter, r *http.Request) 
 		title, ok := r.URL.Query()["t"]
 		if !ok || len(title[0]) < 1 {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("missing title in URL params"))
+			res := ErrorResponse{Message: "missing title in URL params"}
+			writeResponse(nil, res, w, true)
+
 			return
 		}
 
